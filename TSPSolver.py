@@ -128,11 +128,11 @@ class TSPSolver:
         bssf = self.defaultRandomTour()['soln']
 
         # Create variables to track max size of priority queue, # of bssf updates, total states created, total states pruned, all initialized to 0
-        maxHeapSize = bssfUpdateCount = statesCreated = statesKilled = 0
+        maxHeapSize = bssfUpdateCount = childrenCreated = childrenKilled = 0
 
         # Create set of cities to be used in determining potential children later and list of cities to create state matrix
         citiesList = self._scenario.getCities()
-        # TODO: citiesSet = set(self._scenario.getCities()) <--may not need this, can scan state for cities with currently feasible routes. False, you need it to measure when you are at the end of a route
+        citiesSet = set(self._scenario.getCities())
         citiesLen = len(citiesList)
 
         # Start timer
@@ -149,28 +149,31 @@ class TSPSolver:
         nodeCost = self.reduceMatrix(state, citiesLen)
 
         # Choose first city to be root node and put matrix into node along with cost. Set parents as empty list. Set current node = this node
-        currentNode = {'city': citiesList[0], 'nodeCost': nodeCost, 'state': state, 'depth': 0, 'ancestors': []}
+        currentNode = {'city': citiesList[0], 'nodeCost': nodeCost, 'state': state, 'depth': 0, 'ancestorList': [], 'ancestorSet': set()}
 
         # Create priority queue to hold child nodes for potential exploration
         childHeap = heapq.heapify([])
 
         # While loop terminates if 60 seconds have passed or if the BSSF has been found
         while time.time()-startTime < time_allowance and currentNode is not None:
-            # Create list of potential children by copying from state array
-            #potentialChildren = currentNode['state'][currentNode['city']._index, :]
             state = currentNode['state']
             currentNodeIndex = currentNode['city']._index
 
-            # Iterate over each list item and if possible, determine cost
-            # TODO: Bring back child set to measure when at the end of a list.
-            for childIndex in range(citiesLen):
+            # Get set of unvisited cities
+            childSet = citiesSet - currentNode['ancestorSet']
+
+            for child in childSet:
+                childIndex = child._index  # ['city']._index
                 interCityCost = state[currentNodeIndex][childIndex]
+
+                # check if route is possible
                 if not isinf(interCityCost):
                     # Create cost variable, aggregate the following costs into it: the current node's cost, the cost of travelling from current city to child city
-                    nodeCost = currentNode['nodeCost'] + interCityCost()
+                    nodeCost = currentNode['nodeCost'] + interCityCost
 
-                    # Create parent set for child node from current node and add current node into it
-                    childAncestors = currentNode['ancestors'].copy().append(currentNode)
+                    # Create parent list and set for child node from current node and add current node into it
+                    childAncestorList = currentNode['ancestorList'].copy().append(currentNode['city'])
+                    childAncestorSet = currentNode['ancestorSet'].copy().add(currentNode['city'])
 
                     # Record depth of child node for later use in childHeap
                     childDepth = currentNode['depth'] + 1
@@ -179,8 +182,8 @@ class TSPSolver:
                     childState = state.copy()
 
                     # Iterate over parent set of current node and set entries travelling from child to those cities to inf
-                    for ancestor in childAncestors:
-                        childState[childIndex][ancestor['city']._index] = inf
+                    for ancestor in childAncestorList:
+                        childState[childIndex][ancestor._index] = inf
 
                     # Set row corresponding to current city and column corresponding to child city to inf
                     childState[currentNodeIndex, :] = inf
@@ -189,12 +192,19 @@ class TSPSolver:
                     # Row and column reduce matrix again, tracking additional cost and add to cost variable
                     nodeCost += self.reduceMatrix(childState, citiesLen)
 
-                    #TODO: if cost of node is <= BSSF cost, add child node to priority queue unless size of child list is 1, in which case we will replace BSSF. Else, increment total states pruned.
                     if nodeCost <= bssf.cost:
-                        # TODO: continue here after bringing back sets...
+                        if len(childSet) == 1:
+                            # Replace BSSF
+                            bssf = TSPSolution(childAncestorList.append(child))
+                        else:
+                            # Add child to priority queue using node cost as key in tupe
+                            childNode = {'city': child, 'nodeCost': nodeCost, 'state': childState, 'depth': childDepth, 'ancestorList': childAncestorList, 'ancestorSet': childAncestorSet}
+                            childHeap.add((nodeCost, childNode))
+                    else:
+                        childrenKilled += 1
 
-
-                #TODO: increment total states created count
+                    # Increment total states created count
+                    childrenCreated += 1
             # TODO: pop heap and set current node equal to it or set to null if empty. If not empty, calculate temporary total value by adding on difference in depth of this node * average cost to try and predict what cost at equal depth is. Pop off queue until better option than current node comes up, saving popped entries in list. then put them back in.
         # If there are no children left in the queue, every possibility has been explored and we know that our BSSF is in fact the best solution
         # TODO: measure size of priority queue and update max queue size if necessary

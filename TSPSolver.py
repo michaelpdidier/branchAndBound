@@ -158,7 +158,8 @@ class TSPSolver:
                     totalCost += column
                     totalCount += 1
 
-        averageCost = totalCount/totalCount
+        depthPenalty = (totalCost/totalCount)/(4/5)
+        print(depthPenalty)
 
         # Choose first city to be root node and put matrix into node along with cost. Set parents as empty list. Set current node = this node
         currentNode = stateNode(0, nodeCost, citiesList[0], state, 0, [], set())
@@ -167,12 +168,14 @@ class TSPSolver:
         childHeap = []
 
         # While loop terminates if 60 seconds have passed or if the BSSF has been found
-        while time.time()-startTime < time_allowance and currentNode is not None:
+        while currentNode is not None:
+            #time.time()-startTime < time_allowance and TODO: add back in to while loop later
             state = currentNode.state
             currentNodeIndex = currentNode.city._index
 
             # Get set of unvisited cities
             childSet = citiesSet - currentNode.ancestorSet
+            childSet.remove(currentNode.city)
 
             for child in childSet:
                 childIndex = child._index  # ['city']._index
@@ -209,12 +212,13 @@ class TSPSolver:
                     if nodeCost <= bssf.cost:
                         if len(childSet) == 1:
                             # Replace BSSF
-                            bssf = TSPSolution(childAncestorList.append(child))
+                            childAncestorList.append(child)
+                            bssf = TSPSolution(childAncestorList)
                             bssfUpdateCount += 1
 
                         else:
                             # Add child to priority queue using node cost as key in tuple
-                            childNode = stateNode(nodeCost+(averageCost*(maxDepth-childDepth)), nodeCost, child, childState, childDepth, childAncestorList, childAncestorSet)
+                            childNode = stateNode(nodeCost+(depthPenalty*(maxDepth-childDepth)), nodeCost, child, childState, childDepth, childAncestorList, childAncestorSet)
 
                             #Create priority key by adding the average cost * number of cities remaining to current cost. This should shift the balance between breadth and depth the search
                             heapq.heappush(childHeap, childNode)

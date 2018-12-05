@@ -124,6 +124,7 @@ class TSPSolver:
         max queue size, total number of states created, and number of pruned states.</returns> 
     '''
 
+    # O(n!) in absolute worst possible case for time and space
     def branchAndBound( self, time_allowance=60.0 ):
 
         # Find initial BSSF by calling the random algorithm and setting that as BSSF

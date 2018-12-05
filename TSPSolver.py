@@ -168,8 +168,7 @@ class TSPSolver:
         childHeap = []
 
         # While loop terminates if 60 seconds have passed or if the BSSF has been found
-        while currentNode is not None:
-            #time.time()-startTime < time_allowance and TODO: add back in to while loop later
+        while time.time()-startTime < time_allowance and currentNode is not None:
             state = currentNode.state
             currentNodeIndex = currentNode.city._index
 

@@ -149,24 +149,30 @@ class TSPSolver:
         # Reduce initial matrix
         nodeCost = self.reduceMatrix(state, citiesLen)
 
+        totalCost = totalCount = 0
+
         # Find average cost
-        averageCost = np.average(state)
+        for row in state:
+            for column in row:
+                if not isinf(column):
+                    totalCost += column
+                    totalCount += 1
+
+        averageCost = totalCount/totalCount
 
         # Choose first city to be root node and put matrix into node along with cost. Set parents as empty list. Set current node = this node
-        currentNode = {'city': citiesList[0], 'nodeCost': nodeCost, 'state': state, 'depth': 0, 'ancestorList': [], 'ancestorSet': set()}
-
-        deepestNode = currentNode
+        currentNode = stateNode(0, nodeCost, citiesList[0], state, 0, [], set())
 
         # Create priority queue to hold child nodes for potential exploration
         childHeap = []
 
         # While loop terminates if 60 seconds have passed or if the BSSF has been found
         while time.time()-startTime < time_allowance and currentNode is not None:
-            state = currentNode['state']
-            currentNodeIndex = currentNode['city']._index
+            state = currentNode.state
+            currentNodeIndex = currentNode.city._index
 
             # Get set of unvisited cities
-            childSet = citiesSet - currentNode['ancestorSet']
+            childSet = citiesSet - currentNode.ancestorSet
 
             for child in childSet:
                 childIndex = child._index  # ['city']._index
@@ -175,14 +181,16 @@ class TSPSolver:
                 # check if route is possible
                 if not isinf(interCityCost):
                     # Create cost variable, aggregate the following costs into it: the current node's cost, the cost of travelling from current city to child city
-                    nodeCost = currentNode['nodeCost'] + interCityCost
+                    nodeCost = currentNode.nodeCost + interCityCost
 
                     # Create parent list and set for child node from current node and add current node into it
-                    childAncestorList = currentNode['ancestorList'].copy().append(currentNode['city'])
-                    childAncestorSet = currentNode['ancestorSet'].copy().add(currentNode['city'])
+                    childAncestorList = currentNode.ancestorList.copy()
+                    childAncestorList.append(currentNode.city)
+                    childAncestorSet = currentNode.ancestorSet.copy()
+                    childAncestorSet.add(currentNode.city)
 
                     # Record depth of child node for later use in childHeap
-                    childDepth = currentNode['depth'] + 1
+                    childDepth = currentNode.depth + 1
 
                     # Create the state matrix by copying the current node's state matrix
                     childState = state.copy()
@@ -206,10 +214,10 @@ class TSPSolver:
 
                         else:
                             # Add child to priority queue using node cost as key in tuple
-                            childNode = {'city': child, 'nodeCost': nodeCost, 'state': childState, 'depth': childDepth, 'ancestorList': childAncestorList, 'ancestorSet': childAncestorSet}
+                            childNode = stateNode(nodeCost+(averageCost*(maxDepth-childDepth)), nodeCost, child, childState, childDepth, childAncestorList, childAncestorSet)
 
                             #Create priority key by adding the average cost * number of cities remaining to current cost. This should shift the balance between breadth and depth the search
-                            heapq.heappush(childHeap, (nodeCost+(averageCost*(maxDepth-childDepth)), childNode))
+                            heapq.heappush(childHeap, childNode)
 
                     else:
                         childrenKilled += 1
@@ -219,7 +227,7 @@ class TSPSolver:
 
             # Update max heap size
             if len(childHeap) > maxHeapSize:
-                maxHeapSize = childHeap
+                maxHeapSize = len(childHeap)
 
             # Check for next possible path
             nodeFound = False
@@ -228,11 +236,11 @@ class TSPSolver:
             while not nodeFound and len(childHeap) > 0:
                 candidateNode = heapq.heappop(childHeap)
 
-                #check for nodes with worse paths than BSSF
-                if candidateNode['nodeCost'] < bssf.cost:
+                # Check for nodes with worse paths than BSSF
+                if candidateNode.nodeCost < bssf.cost:
                     currentNode = candidateNode
                     nodeFound = True
-                #prune node
+                # Prune node
                 else:
                     childrenKilled += 1
 

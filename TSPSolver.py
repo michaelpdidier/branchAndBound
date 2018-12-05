@@ -17,7 +17,7 @@ from TSPClasses import *
 import heapq
 import itertools
 from math import inf, isinf
-
+from statistics import mean
 
 class TSPSolver:
     def __init__( self, gui_view ):
@@ -134,6 +134,7 @@ class TSPSolver:
         citiesList = self._scenario.getCities()
         citiesSet = set(self._scenario.getCities())
         citiesLen = len(citiesList)
+        maxDepth = citiesLen
 
         # Start timer
         startTime = time.time()
@@ -148,11 +149,16 @@ class TSPSolver:
         # Reduce initial matrix
         nodeCost = self.reduceMatrix(state, citiesLen)
 
+        # Find average cost
+        averageCost = np.average(state)
+
         # Choose first city to be root node and put matrix into node along with cost. Set parents as empty list. Set current node = this node
         currentNode = {'city': citiesList[0], 'nodeCost': nodeCost, 'state': state, 'depth': 0, 'ancestorList': [], 'ancestorSet': set()}
 
+        deepestNode = currentNode
+
         # Create priority queue to hold child nodes for potential exploration
-        childHeap = heapq.heapify([])
+        childHeap = []
 
         # While loop terminates if 60 seconds have passed or if the BSSF has been found
         while time.time()-startTime < time_allowance and currentNode is not None:
@@ -196,19 +202,55 @@ class TSPSolver:
                         if len(childSet) == 1:
                             # Replace BSSF
                             bssf = TSPSolution(childAncestorList.append(child))
+                            bssfUpdateCount += 1
+
                         else:
-                            # Add child to priority queue using node cost as key in tupe
+                            # Add child to priority queue using node cost as key in tuple
                             childNode = {'city': child, 'nodeCost': nodeCost, 'state': childState, 'depth': childDepth, 'ancestorList': childAncestorList, 'ancestorSet': childAncestorSet}
-                            childHeap.add((nodeCost, childNode))
+
+                            #Create priority key by adding the average cost * number of cities remaining to current cost. This should shift the balance between breadth and depth the search
+                            heapq.heappush(childHeap, (nodeCost+(averageCost*(maxDepth-childDepth)), childNode))
+
                     else:
                         childrenKilled += 1
 
                     # Increment total states created count
                     childrenCreated += 1
-            # TODO: pop heap and set current node equal to it or set to null if empty. If not empty, calculate temporary total value by adding on difference in depth of this node * average cost to try and predict what cost at equal depth is. Pop off queue until better option than current node comes up, saving popped entries in list. then put them back in.
-        # If there are no children left in the queue, every possibility has been explored and we know that our BSSF is in fact the best solution
-        # TODO: measure size of priority queue and update max queue size if necessary
-        # TODO: calculate time passed if not timed out
+
+            # Update max heap size
+            if len(childHeap) > maxHeapSize:
+                maxHeapSize = childHeap
+
+            # Check for next possible path
+            nodeFound = False
+            currentNode = None
+
+            while not nodeFound and len(childHeap) > 0:
+                candidateNode = heapq.heappop(childHeap)
+
+                #check for nodes with worse paths than BSSF
+                if candidateNode['nodeCost'] < bssf.cost:
+                    currentNode = candidateNode
+                    nodeFound = True
+                #prune node
+                else:
+                    childrenKilled += 1
+
+
+        endTime = time.time()
+        childrenKilled += len(childHeap)
+
+        results = {'cost': bssf.cost}
+        results['time'] = endTime - startTime
+        results['count'] = bssfUpdateCount
+        results['soln'] = bssf
+        results['max'] = maxHeapSize
+        results['total'] = childrenCreated
+        results['pruned'] = childrenKilled
+        return results
+
+
+
 
     ''' <summary>
         This is the entry point for the algorithm you'll write for your group project.

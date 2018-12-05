@@ -89,11 +89,12 @@ class TSPSolver:
         <summary>This is the function used to reduce rows and columns in a state matrix.</summary>
         <returns>Total cost of reduction.</returns> 
     '''
-
+    # O(n^2) time and O(1) space for n = citiesLen
     def reduceMatrix(self, state, citiesLen):
         # Save reduction cost
         totalCost = 0
 
+        # O(n^2) time and O(1) space for n = number of cities
         # Perform row reduction
         for departingCity in range(citiesLen):
             minCost = min(state[departingCity, :])
@@ -102,6 +103,7 @@ class TSPSolver:
             totalCost += minCost
             state[departingCity, :] -= minCost
 
+        # O(n^2) time and O(1) space for n = number of cities
         # Perform column reduction
         for arrivingCity in range(citiesLen):
             minCost = min(state[:, arrivingCity])
@@ -151,6 +153,7 @@ class TSPSolver:
 
         totalCost = totalCount = 0
 
+        # O(n^2) time, O(1) space for n = number of cities
         # Find average cost
         for row in state:
             for column in row:
@@ -158,8 +161,8 @@ class TSPSolver:
                     totalCost += column
                     totalCount += 1
 
+        # This value can be increased to place more emphasis on deep searching vs. broad searching. Nodes at smaller depths will be penalized more heavily by this value
         depthPenalty = (totalCost/totalCount)/(4/5)
-        print(depthPenalty)
 
         # Choose first city to be root node and put matrix into node along with cost. Set parents as empty list. Set current node = this node
         currentNode = stateNode(0, nodeCost, citiesList[0], state, 0, [], set())
@@ -167,17 +170,21 @@ class TSPSolver:
         # Create priority queue to hold child nodes for potential exploration
         childHeap = []
 
-        # While loop terminates if 60 seconds have passed or if the BSSF has been found
+        # O(n!) time and space if time bound below is infinite for n = number of cities
+        # While loop terminates if input amount of seconds have passed or if the BSSF has been found
         while time.time()-startTime < time_allowance and currentNode is not None:
             state = currentNode.state
             currentNodeIndex = currentNode.city._index
 
+            # O(n) time and space for n = number of cities
             # Get set of unvisited cities
             childSet = citiesSet - currentNode.ancestorSet
             childSet.remove(currentNode.city)
 
+            # O(n^3) time for n = number of cities
             for child in childSet:
-                childIndex = child._index  # ['city']._index
+                childIndex = child._index
+                # O(1) time and space
                 interCityCost = state[currentNodeIndex][childIndex]
 
                 # check if route is possible
@@ -185,6 +192,7 @@ class TSPSolver:
                     # Create cost variable, aggregate the following costs into it: the current node's cost, the cost of travelling from current city to child city
                     nodeCost = currentNode.nodeCost + interCityCost
 
+                    # Both actions are O(n) time and space for n = number of cities
                     # Create parent list and set for child node from current node and add current node into it
                     childAncestorList = currentNode.ancestorList.copy()
                     childAncestorList.append(currentNode.city)
@@ -194,17 +202,21 @@ class TSPSolver:
                     # Record depth of child node for later use in childHeap
                     childDepth = currentNode.depth + 1
 
+                    # O(n^2) time and space for n = number of cities
                     # Create the state matrix by copying the current node's state matrix
                     childState = state.copy()
 
+                    # O(n) time and O(1) space for n = number of cities
                     # Iterate over parent set of current node and set entries travelling from child to those cities to inf
                     for ancestor in childAncestorList:
                         childState[childIndex][ancestor._index] = inf
 
+                    # O(n) time and O(1) space for n = number of cities
                     # Set row corresponding to current city and column corresponding to child city to inf
                     childState[currentNodeIndex, :] = inf
                     childState[:, childIndex] = inf
 
+                    # O(n^2) time and O(1) space for n = number of cities
                     # Row and column reduce matrix again, tracking additional cost and add to cost variable
                     nodeCost += self.reduceMatrix(childState, citiesLen)
 
@@ -212,6 +224,7 @@ class TSPSolver:
                         if len(childSet) == 1:
                             # Replace BSSF
                             childAncestorList.append(child)
+                            # O(n) time and O(1) space for n = number of cities
                             bssf = TSPSolution(childAncestorList)
                             bssfUpdateCount += 1
 
@@ -219,7 +232,8 @@ class TSPSolver:
                             # Add child to priority queue using node cost as key in tuple
                             childNode = stateNode(nodeCost+(depthPenalty*(maxDepth-childDepth)), nodeCost, child, childState, childDepth, childAncestorList, childAncestorSet)
 
-                            #Create priority key by adding the average cost * number of cities remaining to current cost. This should shift the balance between breadth and depth the search
+                            # Create priority key by adding the average cost * number of cities remaining to current cost. This should shift the balance between breadth and depth the search
+                            # O(log(n)) time and O(1) space for n = size of heap
                             heapq.heappush(childHeap, childNode)
 
                     else:
@@ -236,7 +250,9 @@ class TSPSolver:
             nodeFound = False
             currentNode = None
 
+            # O(nlog(n)) time and O(1) space for n = size of heap
             while not nodeFound and len(childHeap) > 0:
+                # O(log(n)) time and O(1) space for n = size of heap
                 candidateNode = heapq.heappop(childHeap)
 
                 # Check for nodes with worse paths than BSSF
@@ -252,7 +268,8 @@ class TSPSolver:
         childrenKilled += len(childHeap)
 
         results = {'cost': bssf.cost}
-        results['time'] = endTime - startTime
+        results['time'] = round(endTime - startTime, 1)
+        print(results['time'])
         results['count'] = bssfUpdateCount
         results['soln'] = bssf
         results['max'] = maxHeapSize
